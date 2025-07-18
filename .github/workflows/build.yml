@@ -1,0 +1,21 @@
+name: Build GeoExplorer WAR
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y ant openjdk-8-jdk
+      - name: init externals
+        run: ant init
+      - name: Build dist
+        run: ant dist
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: geoexplorer-war
+          path: build/geoexplorer/geoexplorer.war
