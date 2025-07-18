@@ -1,20 +1,46 @@
 name: Build GeoExplorer WAR
+
 on:
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # 1. Клонируем главный репо
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
-      - name: Install dependencies
+          fetch-depth: 0           # нужен полный репозиторий для сабмодулей
+          submodules: false        # пока сабмодули не трогаем
+
+      # 2. Заменяем протокол git:// → https://
+      - name: Rewrite submodule URLs to HTTPS
+        run: |
+          git config --global url."https://github.com/".insteadOf git://github.com/
+          # пропишем и для ssh-варианта на всякий случай
+          git config --global url."https://github.com/".insteadOf git@github.com:
+          # синхронизируем .gitmodules
+          git submodule sync --recursive
+
+      # 3. Теперь спокойно инициализируем сабмодули
+      - name: Init submodules
+        run: |
+          git submodule update --init --recursive --depth 1
+
+      # 4. Ставим зависимости
+      - name: Install build tools
         run: sudo apt-get update && sudo apt-get install -y ant openjdk-8-jdk
-      - name: init externals
+
+      # 5. Подтягиваем внешние JS/CSS-библиотеки
+      - name: ant init
         run: ant init
-      - name: Build dist
+
+      # 6. Собираем dist
+      - name: ant dist
         run: ant dist
-      - name: Upload artifact
+
+      # 7. Загружаем artefact
+      - name: Upload WAR
         uses: actions/upload-artifact@v4
         with:
           name: geoexplorer-war
