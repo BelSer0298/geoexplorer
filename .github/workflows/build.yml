@@ -1,46 +1,40 @@
 name: Build GeoExplorer WAR
-on:
-  workflow_dispatch:
+on: [workflow_dispatch]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1. Клонируем сам форк, без сабмодулей
+      # 0. Клонируем без сабмодулей (будем подменять URL)
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: false
 
-      # 2. Подменяем git:// и ssh-URL-ы на https://
-      - name: Rewrite git:// → https://
-        run: |
+      # 1. Меняем git:// и ssh → https://, чтобы сабмодули тянулись
+      - run: |
           git config --global url."https://".insteadOf git://
           git config --global url."https://github.com/".insteadOf git@github.com:
-          # поправим возможные записи в .gitmodules
-          grep -rlZ 'git://github.com' -- .gitmodules */.gitmodules 2>/dev/null | \
-            xargs -0 --no-run-if-empty sed -i 's#git://github.com/#https://github.com/#g'
           git submodule sync --recursive
 
-      # 3. Теперь качаем сабмодули
-      - name: Init submodules
-        run: git submodule update --init --recursive --depth 1
+      # 2. Качаем сабмодули
+      - run: git submodule update --init --recursive --depth 1
 
-      # 4. Ставим инструменты
-      - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install -y ant openjdk-8-jdk
+      # 3. Ставим JDK 8 и Apache Ivy (Ant подтянем сразу)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+      - run: sudo apt-get update && sudo apt-get install -y ant ant-optional ivy
 
-      # 5. ant init — тянем внешние JS/CSS
-      - name: ant init
-        run: ant init
+      # 4. ant init — внешние JS/CSS
+      - run: ant init
 
-      # 6. Сборка
-      - name: ant dist
-        run: ant dist
+      # 5. ant dist — полная сборка (ringojs теперь компилится без ошибок)
+      - run: ant dist
 
-      # 7. Загружаем артефакт
-      - name: Upload WAR
-        uses: actions/upload-artifact@v4
+      # 6. Артефакт
+      - uses: actions/upload-artifact@v4
         with:
           name: geoexplorer-war
           path: build/geoexplorer/geoexplorer.war
