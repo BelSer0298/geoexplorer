@@ -1,5 +1,4 @@
 name: Build GeoExplorer WAR
-
 on:
   workflow_dispatch:
 
@@ -7,39 +6,39 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1. Клонируем главный репо
+      # 1. Клонируем сам форк, без сабмодулей
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0           # нужен полный репозиторий для сабмодулей
-          submodules: false        # пока сабмодули не трогаем
+          fetch-depth: 0
+          submodules: false
 
-      # 2. Заменяем протокол git:// → https://
-      - name: Rewrite submodule URLs to HTTPS
+      # 2. Подменяем git:// и ssh-URL-ы на https://
+      - name: Rewrite git:// → https://
         run: |
-          git config --global url."https://github.com/".insteadOf git://github.com/
-          # пропишем и для ssh-варианта на всякий случай
+          git config --global url."https://".insteadOf git://
           git config --global url."https://github.com/".insteadOf git@github.com:
-          # синхронизируем .gitmodules
+          # поправим возможные записи в .gitmodules
+          grep -rlZ 'git://github.com' -- .gitmodules */.gitmodules 2>/dev/null | \
+            xargs -0 --no-run-if-empty sed -i 's#git://github.com/#https://github.com/#g'
           git submodule sync --recursive
 
-      # 3. Теперь спокойно инициализируем сабмодули
+      # 3. Теперь качаем сабмодули
       - name: Init submodules
-        run: |
-          git submodule update --init --recursive --depth 1
+        run: git submodule update --init --recursive --depth 1
 
-      # 4. Ставим зависимости
+      # 4. Ставим инструменты
       - name: Install build tools
         run: sudo apt-get update && sudo apt-get install -y ant openjdk-8-jdk
 
-      # 5. Подтягиваем внешние JS/CSS-библиотеки
+      # 5. ant init — тянем внешние JS/CSS
       - name: ant init
         run: ant init
 
-      # 6. Собираем dist
+      # 6. Сборка
       - name: ant dist
         run: ant dist
 
-      # 7. Загружаем artefact
+      # 7. Загружаем артефакт
       - name: Upload WAR
         uses: actions/upload-artifact@v4
         with:
